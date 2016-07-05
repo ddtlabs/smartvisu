@@ -3,7 +3,7 @@
  * -----------------------------------------------------------------------------
  * @package     smartVISU
  * @author      Martin Gleiß
- * @copyright   2012 - 2015
+ * @copyright   2012
  * @license     GPL [http://www.gnu.de]
  * -----------------------------------------------------------------------------
  */
@@ -21,11 +21,14 @@ define ('const_path', substr(const_path_system, 0, -4));
 
 /**
  * Load default-config and individual config
- */
-if (is_file(const_path.'config.php'))
-	require_once const_path.'config.php';
 
+if (is_file(const_path.'config.php')) require_once const_path.'config.php';
 require_once const_path_system.'defaults.php';
+*/
+
+require_once const_path_system.'functions_config.php';
+$cfg = new config(const_path.'config.ini');
+$cfg -> load_config();
 
 /**
  * Include main-functions
