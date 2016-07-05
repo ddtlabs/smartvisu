@@ -1,6 +1,6 @@
 /**
  * Grid theme for Highcharts JS
- * @author Torstein Honsi
+ * @author Torstein Hønsi
  */
 
 Highcharts.theme = {

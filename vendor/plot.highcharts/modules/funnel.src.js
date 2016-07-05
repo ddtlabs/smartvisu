@@ -1,19 +1,14 @@
 /**
  * @license 
- * Highcharts funnel module
+ * Highcharts funnel module, Beta
  *
- * (c) 2010-2016 Torstein Honsi
+ * (c) 2010-2012 Torstein Hønsi
  *
  * License: www.highcharts.com/license
  */
-/* eslint indent:0 */
-(function (factory) {
-    if (typeof module === 'object' && module.exports) {
-        module.exports = factory;
-    } else {
-        factory(Highcharts);
-    }
-}(function (Highcharts) {
+
+/*global Highcharts */
+(function (Highcharts) {
 	
 'use strict';
 
@@ -27,13 +22,12 @@ var defaultOptions = Highcharts.getOptions(),
 
 // set default options
 defaultPlotOptions.funnel = merge(defaultPlotOptions.pie, {
-	animation: false,
 	center: ['50%', '50%'],
 	width: '90%',
 	neckWidth: '30%',
 	height: '100%',
 	neckHeight: '25%',
-	reversed: false,
+
 	dataLabels: {
 		//position: 'right',
 		connectorWidth: 1,
@@ -71,22 +65,20 @@ seriesTypes.funnel = Highcharts.extendClass(seriesTypes.pie, {
 			sum = 0,
 			series = this,
 			chart = series.chart,
-			options = series.options,
-			reversed = options.reversed,
-			ignoreHiddenPoint = options.ignoreHiddenPoint,
 			plotWidth = chart.plotWidth,
 			plotHeight = chart.plotHeight,
 			cumulative = 0, // start at top
+			options = series.options,
 			center = options.center,
 			centerX = getLength(center[0], plotWidth),
-			centerY = getLength(center[1], plotHeight),
+			centerY = getLength(center[0], plotHeight),
 			width = getLength(options.width, plotWidth),
 			tempWidth,
 			getWidthAt,
 			height = getLength(options.height, plotHeight),
 			neckWidth = getLength(options.neckWidth, plotWidth),
 			neckHeight = getLength(options.neckHeight, plotHeight),
-			neckY = (centerY - height / 2) + height - neckHeight,
+			neckY = height - neckHeight,
 			data = series.data,
 			path,
 			fraction,
@@ -102,14 +94,12 @@ seriesTypes.funnel = Highcharts.extendClass(seriesTypes.pie, {
 
 		// Return the width at a specific y coordinate
 		series.getWidthAt = getWidthAt = function (y) {
-			var top = (centerY - height / 2);
-			
-			return y > neckY || height === neckHeight ?
+			return y > height - neckHeight || height === neckHeight ?
 				neckWidth :
-				neckWidth + (width - neckWidth) * (1 - (y - top) / (height - neckHeight));
+				neckWidth + (width - neckWidth) * ((height - neckHeight - y) / (height - neckHeight));
 		};
 		series.getX = function (y, half) {
-			return centerX + (half ? -1 : 1) * ((getWidthAt(reversed ? plotHeight - y : y) / 2) + options.dataLabels.distance);
+			return centerX + (half ? -1 : 1) * ((getWidthAt(y) / 2) + options.dataLabels.distance);
 		};
 
 		// Expose
@@ -140,9 +130,7 @@ seriesTypes.funnel = Highcharts.extendClass(seriesTypes.pie, {
 
 		// get the total sum
 		each(data, function (point) {
-			if (!ignoreHiddenPoint || point.visible !== false) {
-				sum += point.y;
-			}
+			sum += point.y;
 		});
 
 		each(data, function (point) {
@@ -175,11 +163,6 @@ seriesTypes.funnel = Highcharts.extendClass(seriesTypes.pie, {
 				y3 = neckY;
 			}
 
-			if (reversed) {
-				y1 = height - y1;
-				y3 = height - y3;
-				y5 = (y5 ? height - y5 : null);
-			}
 			// save the path
 			path = [
 				'M',
@@ -215,10 +198,11 @@ seriesTypes.funnel = Highcharts.extendClass(seriesTypes.pie, {
 			// Mimicking pie data label placement logic
 			point.half = half;
 
-			if (!ignoreHiddenPoint || point.visible !== false) {
-				cumulative += fraction;
-			}
-		});		
+			cumulative += fraction;
+		});
+
+
+		series.setTooltipPoints();
 	},
 	/**
 	 * Draw a single point (wedge)
@@ -228,35 +212,27 @@ seriesTypes.funnel = Highcharts.extendClass(seriesTypes.pie, {
 	 */
 	drawPoints: function () {
 		var series = this,
+			options = series.options,
 			chart = series.chart,
-			renderer = chart.renderer,
-			pointAttr,
-			shapeArgs,
-			graphic;
+			renderer = chart.renderer;
 
 		each(series.data, function (point) {
-			graphic = point.graphic;
-			shapeArgs = point.shapeArgs;
+			
+			var graphic = point.graphic,
+				shapeArgs = point.shapeArgs;
 
-			pointAttr = point.pointAttr[point.selected ? 'select' : ''];
-
-			if (!graphic) { // Create the shapes				
-				point.graphic = renderer.path(shapeArgs)
-					.attr(pointAttr)
-					.add(series.group);
+			if (!graphic) { // Create the shapes
+				point.graphic = renderer.path(shapeArgs).
+					attr({
+						fill: point.color,
+						stroke: options.borderColor,
+						'stroke-width': options.borderWidth
+					}).
+					add(series.group);
 					
 			} else { // Update the shapes
-				graphic.attr(pointAttr).animate(shapeArgs);
+				graphic.animate(shapeArgs);
 			}
-		});
-	},
-
-	/**
-	 * Funnel items don't have angles (#2289)
-	 */
-	sortByAngle: function (points) {
-		points.sort(function (a, b) {
-			return a.plotY - b.plotY;
 		});
 	},
 	
@@ -304,17 +280,5 @@ seriesTypes.funnel = Highcharts.extendClass(seriesTypes.pie, {
 
 });
 
-/** 
- * Pyramid series type.
- * A pyramid series is a special type of funnel, without neck and reversed by default.
- */
-defaultOptions.plotOptions.pyramid = Highcharts.merge(defaultOptions.plotOptions.funnel, {        
-	neckWidth: '0%',
-	neckHeight: '0%',
-	reversed: true
-});
-Highcharts.seriesTypes.pyramid = Highcharts.extendClass(Highcharts.seriesTypes.funnel, {
-	type: 'pyramid'
-});
 
-}));
+}(Highcharts));
